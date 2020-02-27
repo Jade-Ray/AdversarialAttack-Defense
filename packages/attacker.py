@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import math
 
+from packages.myDecorator import cuda_free_cache
+
 class _ModelMixin(object):
 
     @property
@@ -59,6 +61,9 @@ class _PhysicalMixin(object):
             raise ValueError('bit_width must be 255')
         self._bit_width = value
 
+    def epsilon_physical(self, epsilon):
+        return int(epsilon * self.bit_width)
+
 class Attacker_FGSA(_Attacker):
 
     def __init__(self, model, device='cpu', epsilon=0.005):
@@ -77,6 +82,7 @@ class Attacker_FGSA(_Attacker):
     def epsilon(self, value):
         self._epsilon = value
 
+    @cuda_free_cache
     def attack(self, inputs, targets):
         inputs, targets = inputs.to(self.device), targets.to(self.device)
         inputs.requires_grad = True
@@ -101,7 +107,7 @@ class Attacker_FGSA_physical(Attacker_FGSA, _PhysicalMixin):
     
     @property
     def name(self):
-        return f'Fast Gradient Sign Attack in phsical(per-pixel only change 1/{self.bit_width}, epsilon={self.epsilon:.4f})'
+        return f'Fast Gradient Sign Attack in phsical(epsilon={self.epsilon_physical(self.epsilon)}/{self.bit_width})'
 
     @property
     def epsilon(self):
@@ -125,7 +131,7 @@ class Attacker_IFGSM(_Attacker, _PhysicalMixin):
 
     @property
     def name(self):
-        return f'Iterative FGSM(alpha={self.alpha}, epsilon={self.epsilon:.4f}, bit_width={self.bit_width})'
+        return f'Iterative FGSM(alpha={self.alpha}, epsilon={self.epsilon_physical(self.epsilon)}/{self.bit_width})'
    
     @property
     def alpha(self):
@@ -153,6 +159,7 @@ class Attacker_IFGSM(_Attacker, _PhysicalMixin):
     def num_iter(self):
         return min(self.epsilon * self.bit_width + 4, round(1.25 * self.epsilon * self.bit_width))
 
+    @cuda_free_cache
     def attack(self, inputs, targets):
         inputs, targets = inputs.to(self.device), targets.to(self.device)
         return self._attack_iter(0, inputs, targets, inputs)

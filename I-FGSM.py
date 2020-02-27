@@ -6,7 +6,7 @@ import torchvision
 
 from packages.myGpuDevice import device
 from packages.attacker import Attacker_FGSA_physical, Attacker_IFGSM
-from packages.evaluation import Evaluation_NoTarget
+from packages.evaluation import Evaluation_Attack_NoTarget
 
 # %% [markdown]
 # ### 💕💕💕Experiment of the expression with different epsilon
@@ -15,8 +15,22 @@ state_dict = torch.hub.load_state_dict_from_url('https://download.pytorch.org/mo
                                                 model_dir='./Data/PretrainedModel')
 model.load_state_dict(state_dict)
 
-evaluation = Evaluation_NoTarget(model, device, batch_size=20)
-evaluation.add_attacker([Attacker_FGSA_physical(model, device), Attacker_IFGSM(model, device)])
+# %%
+evaluation = Evaluation_Attack_NoTarget(model, device, batch_size=15)
 
-evaluation.epsilon_evaluation(np.linspace(2, 100, 20))
+# %%
+attacker1 = Attacker_FGSA_physical(model, device)
+
+# %%
+attacker2 = Attacker_IFGSM(model, device)
+
+# %%
+evaluation.add_attacker([attacker1, attacker2])
+
+# %%
+evaluation.attackers_visualize()
+
+# %%
+evaluation.noTarget_evaluation()
+
 # %%

@@ -157,4 +157,4 @@ def dataloader_acc(model, device, dataloader, attacker=None):
     else:
         print('Clean Image Accuracy')
     print(f'Spend time {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s\tAcc: {acc*100:.2f}%([{correct}]/[{totall}])')
-    return acc
+    return acc, f'{time_elapsed:.2f}'
