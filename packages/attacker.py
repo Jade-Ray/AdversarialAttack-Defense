@@ -64,10 +64,10 @@ class _PhysicalMixin(object):
     def epsilon_physical(self, epsilon):
         return int(epsilon * self.bit_width)
 
-class Attacker_FGSA(_Attacker):
+class FGSA_NonTargeted_Digtal(_Attacker):
 
     def __init__(self, model, device='cpu', epsilon=0.005):
-        super(Attacker_FGSA, self).__init__(model, device=device)
+        super().__init__(model, device=device)
         self.epsilon = epsilon
     
     @property
@@ -99,7 +99,7 @@ class Attacker_FGSA(_Attacker):
         perturbed_image = torch.clamp(perturbed_image, 0, 1)
         return perturbed_image
 
-class Attacker_FGSA_physical(Attacker_FGSA, _PhysicalMixin):
+class FGSA_NonTargeted(FGSA_NonTargeted_Digtal, _PhysicalMixin):
 
     def __init__(self, model, device='cpu', epsilon=2, bit_width=255):
         self.bit_width = bit_width
@@ -121,10 +121,21 @@ class Attacker_FGSA_physical(Attacker_FGSA, _PhysicalMixin):
             raise ValueError('epsilon must between 2~128')
         self._epsilon = value / self.bit_width
 
-class Attacker_IFGSM(_Attacker, _PhysicalMixin):
+class FGSA_Targeted(FGSA_NonTargeted):
+
+    def __init__(self, model, device='cpu', epsilon=2, bit_width=255):
+        super().__init__(model, device=device, epsilon=epsilon, bit_width=bit_width)
+
+    def fgsm_attack(self, image, epsilon, data_grad):
+        sign_data_grad = data_grad.sign()
+        perturbed_image = image - epsilon*sign_data_grad
+        perturbed_image = torch.clamp(perturbed_image, 0, 1)
+        return perturbed_image
+
+class IFGSM_NonTargeted(_Attacker, _PhysicalMixin):
 
     def __init__(self, model, device='cpu', alpha=1, epsilon=2, bit_width=255):
-        super(Attacker_IFGSM, self).__init__(model, device=device)
+        super().__init__(model, device=device)
         self.alpha = alpha
         self.bit_width = bit_width
         self.epsilon = epsilon       
@@ -174,13 +185,24 @@ class Attacker_IFGSM(_Attacker, _PhysicalMixin):
         self.model.zero_grad()
         loss.backward()
         data_grad = perturbed_image.grad.data.sign()
-        perturbed_image = torch.add(perturbed_image, self.alpha, data_grad)
+        perturbed_image = self._perturbation(perturbed_image, data_grad)
         perturbed_image = self._clip(inputs, perturbed_image)
 
         return self._attack_iter(num + 1, inputs, targets, perturbed_image.detach())
+
+    def _perturbation(self, perturbed_image, data_grad):
+        return torch.add(perturbed_image, self.alpha, data_grad)
 
     def _clip(self, inputs, perturbed_image):
         perturbed_image = torch.where(perturbed_image > inputs - self.epsilon, perturbed_image, inputs - self.epsilon)
         perturbed_image = torch.where(perturbed_image < inputs + self.epsilon, perturbed_image, inputs + self.epsilon)
         perturbed_image = torch.clamp(perturbed_image, 0, 1)
         return perturbed_image
+
+class IFGSM_Targeted(IFGSM_NonTargeted):
+
+    def __init__(self, model, device='cpu', alpha=1, epsilon=2, bit_width=255):
+        super().__init__(model, device=device, alpha=alpha, epsilon=epsilon, bit_width=bit_width)
+
+    def _perturbation(self, perturbed_image, data_grad):
+        return torch.sub(perturbed_image, self.alpha, data_grad)
